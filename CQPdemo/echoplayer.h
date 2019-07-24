@@ -312,6 +312,7 @@ class Group
 	vector<int64_t> dM;
 	bool stat;
 	int rate;
+	bool counter;
 	string CCC;
 
 public:
@@ -320,6 +321,7 @@ public:
 		this->gid = gid;
 		stat = false;
 		rate = 10;
+		counter = false;
 
 		ifstream CH(usrDir + "g" + to_string(gid) + ".csv");
 		bool Sp = false;
@@ -338,6 +340,7 @@ public:
 					Sp = true;
 					stat = cy[1]._Equal("on");
 					rate = to_int(cy[2]);
+					counter = cy[3]._Equal("counter");
 				}
 				else CCC += "\n" + P2;
 			}
@@ -348,7 +351,7 @@ public:
 	{
 		string Ly;
 		Ly += CCC;
-		Ly += (string)"\necho," + (stat ? "on" : "off") + "," + to_string(rate);
+		Ly += (string)"\necho," + (stat ? "on" : "off") + "," + to_string(rate) + "," + (counter ? "counter" : "noCounter");
 		if (!Ly.empty()) Ly.erase(0, 1);
 		return Ly;
 	}
@@ -363,17 +366,19 @@ public:
 	}
 
 	//	set
-	void set(bool stat, int rate)
+	void set(bool stat, int rate, bool counter)
 	{
 		this->stat = stat;
 		this->rate = rate;
+		this->counter = counter;
 	}
 
 	//	get
-	void get(bool& stat, int& rate)
+	void get(bool& stat, int& rate, bool& counter)
 	{
 		stat = this->stat;
 		rate = this->rate;
+		counter = this->counter;
 	}
 
 	//	is?
@@ -528,14 +533,33 @@ void EchoPlayer(int type, int64_t gid, string msg)
 	Group Where = Group(gid);
 
 	bool stat = false;
-	int rate = 5;
-	Where.get(stat, rate);
+	int rate = 10;
+	bool counter = false;
+	Where.get(stat, rate, counter);
 
 	if (!stat) return;
 	if (msg._Equal(lastEchoMsg(gid))) return;
 
 	if (rand() % 100 + 1 > rate) return;
 
+	if (counter)
+	{
+		string tmpMsg = msg;
+		vector<string> Fd
+		{ 
+			"。","，","！","？","；","～","（","）","【","】","《","》","…","—","“","”",
+			".",",","!","?","(",")","<",">","[","]","{","}","-","~",";","*","\'","\"" 
+		};
+		for (auto D2 : Fd) for (; tmpMsg.find(D2) != string::npos; tmpMsg.erase(tmpMsg.find(D2), D2.length()));
+
+		
+		if (!tmpMsg.empty() && tmpMsg.length() < 4)
+		{
+			if (tmpMsg._Equal("我")) tmpMsg = "你";
+			else if (tmpMsg._Equal("你")) tmpMsg = "我";
+			msg = tmpMsg + "什么" + tmpMsg;
+		}
+	}
 	lastEchoMsg(gid, msg);
 
 	PostMsg(type, gid, msg);
@@ -554,30 +578,37 @@ string echo(bool sudo, int type, int64_t qq, int64_t gid, vector<string> args)
 
 	bool help = false;
 	bool ver = false;
-	int setOn = -1;
-	bool list = false;
-	bool rt = false;
+	bool src = false;
+	bool setStat = false;
+	bool setRate = false;
+	bool setCounter = false;
+	bool list = true;
 
-	/*  id = 0  */	int setRate = 0;
+	/*  id = 0  */	bool newStat;
+	/*  id = 1  */	int newRate = 0;
+	/*  id = 2  */	int newCounter = -1;
 
 	stack<int> ACP;
+	ACP.push(0);
 
 	for (int i = 1; i != args.size(); i++)
 	{
 		if (args.empty()) continue;
 		if (args[i].find("-") == 0)
 		{
+			list = false;
 			if (args[i]._Equal("--help")) help = true;
 			else if (args[i]._Equal("--ver")) ver = true;
-			else if (args[i]._Equal("-l")) list = true;
-			else if (args[i]._Equal("-rate")) rt = true, ACP.push(0);
-			else if (args[i]._Equal("-on")) setOn = 1;
-			else if (args[i]._Equal("-off")) setOn = 0;
+			else if (args[i]._Equal("--source")) src = true;
+			else if (args[i]._Equal("--vs")) ver = src = true;
 
-			if (rt && !sudo && !Where.is_dm(qq))
+			else if (args[i]._Equal("-rate")) setRate = true, ACP.push(1);
+			else if (args[i]._Equal("-counter")) setCounter = true, ACP.push(2);
+
+			if (setRate && !sudo && !Where.is_dm(qq))
 				throw (operator_is_not_dm("-rate参数"));
-			if (setOn != -1 && !sudo && !Where.is_dm(qq))
-				throw (operator_is_not_dm("启用/停用EchoPlayer"));
+			if (setCounter && !sudo && !Where.is_dm(qq))
+				throw (operator_is_not_dm("-counter参数"));
 		}
 		else
 		{
@@ -587,11 +618,24 @@ string echo(bool sudo, int type, int64_t qq, int64_t gid, vector<string> args)
 				switch (ACP.top())
 				{
 				case 0:
+					setStat = true;
+					if (setStat && !sudo && !Where.is_dm(qq))
+						throw (operator_is_not_dm("-counter参数"));
+					if (args[i]._Equal("on")) newStat = true;
+					else if (args[i]._Equal("off")) newStat = false;
+					else throw (arg_illegal(args[i], "只能使用on或off。"));
+					break;
+				case 1:
 					if (!is_num(args[i]))
 						throw (arg_illegal("(-rate)" + args[i]), "请更正为1-100的正整数。");
-					setRate = to_int(args[i]);
-					if (setRate < 1 || setRate>100)
+					newRate = to_int(args[i]);
+					if (newRate < 1 || newRate>100)
 						throw (arg_illegal("(-rate)" + args[i], "触发概率不能小于1，且不能大于100。"));
+					break;
+				case 2:
+					if (args[i]._Equal("on")) newCounter = 1;
+					else if (args[i]._Equal("off")) newCounter = 0;
+					else throw (arg_illegal("(-counter)" + args[i], "只能使用on或off。"));
 					break;
 				}
 				ACP.pop();
@@ -600,48 +644,56 @@ string echo(bool sudo, int type, int64_t qq, int64_t gid, vector<string> args)
 	}
 
 	if (type == PVT) return "错误：指令echo只能在群/组内使用。";
-	if (!help && !ver && setOn == -1 && !list && !rt) return "错误：指令echo必须搭配参数使用。";
+	if (setRate && newRate == 0) throw (arg_not_found("-rate", "请追加1-100的正整数。"));
+	if (setCounter && newCounter == -1) throw (arg_not_found("-counter", "需要指定on/off。"));
 
+	bool Aur = sudo || Where.is_dm(qq);
 	if (help) return string("")
 		+ "【用法】\n"
-		+ ".echo <参数>\n这个指令必须" + (type == PVT ? "在群/组内" : "") + "搭配参数使用。\n\n"
+		+ ".echo" + (Aur ? " [on/off]" : "") + "\n" + (Aur ? "开启或关闭EchoPlayer，如果没有提供参数，则" : "") + "显示EchoPlayer当前的状态。\n\n"
 		+ "【参数】\n"
-		+ ((sudo || Where.is_dm(qq)) ? "-on\n开启EchoPlayer。\n\n" : "")
-		+ ((sudo || Where.is_dm(qq)) ? "-off\n关闭EchoPlayer。\n\n" : "")
-		+ "-l\n查看EchoPlayer的状态。\n\n"
-		+ ((sudo || Where.is_dm(qq)) ? "-rate <几率>\n设置触发几率。\n\n" : "")
+		+ (Aur ? "-rate <几率>\n设置触发几率。\n\n" : "")
+		+ (Aur ? "-counter <on/off>\n开启或关闭counter模式。\n\n" : "")
+		+ "--ver\n查看版本信息。\n\n"
+		+ "--source\n获取源码。\n\n"
 		+ "--help\n显示此信息。";
 
-	if (ver) return string("")
+	if (ver || src) return string("")
 		+ CQAPPID + " " + CQAPPVER + "\n"
-		+ "Copyright (C) 2019 Skot\n"
-		+ "许可证：GPLv3+：GNU通用公共许可证第3版或更新版本<http://gnu.org/licenses/gpl.html>\n"
-		+ "本软件是自由软件：您可以自由修改和重新发布它。\n"
-		+ "在法律范围内没有其他保障。\n"
-		+ "\n"
-		+ "由 天意618A03 (95806902) 编写。";
+		+ (ver ? "Copyright (C) 2019 Skot\n" : "")
+		+ (ver ? "许可证：GPLv3+：GNU通用公共许可证第3版或更新版本<http://gnu.org/licenses/gpl.html>\n" : "")
+		+ (ver ? "本软件是自由软件：您可以自由修改和重新发布它。\n" : "")
+		+ (ver ? "在法律范围内没有其他保障。\n" : "")
+		+ (ver ? "\n" : "")
+		+ (ver ? "由 天意618A03 (95806902) 编写。\n" : "")
+		+ (src ? "源码：https://github.com/Wyrda-La-Darckonit/EchoPlayer-for-Skot.git" : "");
 
 	bool stat = false;
 	int rate = 10;
-	Where.get(stat, rate);
+	bool counter = false;
+	Where.get(stat, rate, counter);
 
-	if (setOn != -1)
+	if (setStat)
 	{
-		if (setOn == 1) stat = true;
-		else stat = false;
-		Where.set(false, rate);
+		Where.set(newStat, rate, counter);
 		Where.Save();
-		Ly += string("") + "EchoPlayer" + (stat ? "启用" : "停用") + "。\n";
+		Ly += string("") + "EchoPlayer" + (newStat ? "开启" : "关闭") + "。\n";
+	}
+	if (setRate)
+	{
+		Where.set(stat, newRate, counter);
+		Where.Save();
+		Ly += string("") + "EchoPlayer的触发概率被设为" + to_string(newRate) + "%。\n";
+	}
+	if (setCounter)
+	{
+		Where.set(stat, rate, newCounter == 1 ? true : false);
+		Where.Save();
+		Ly += string("") + "EchoPlayer的counter模式" + (newCounter == 1 ? "开启" : "关闭") + "。\n";
 	}
 
-	if (rt)
-	{
-		Where.set(stat, setRate);
-		Where.Save();
-		Ly += string("") + "EchoPlayer的触发概率被设为" + to_string(setRate) + "%。\n";
-	}
-
-	if (list) Ly += string("") + "EchoPlayer当前已" + (stat ? "启用" : "停用") + "，触发概率为" + to_string(rate) + "%。\n";
+	Where.get(stat, rate, counter);
+	if (list) Ly += string("") + "EchoPlayer：" + (stat ? "开启" : "关闭") + "\n触发概率：" + to_string(rate) + "%\ncounter模式：" + (counter ? "开启" : "关闭");
 
 	return Ly;
 }
