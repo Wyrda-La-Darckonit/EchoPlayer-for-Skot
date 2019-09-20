@@ -4,10 +4,10 @@
 {
   "apiver": 9, // Api版本，本SDK为9
 
-  "author": "天意618A03", // 应用作者
+  "author": "Wyrda La Darckonit", // 应用作者
   "name": "EchoPlayer复读机 for Skot", // 应用名称
-  "version": "2.0.1", // 应用版本
-  "version_id": 2, // 应用顺序版本（每次发布时至少+1）,
+  "version": "2.1.0", // 应用版本
+  "version_id": 3, // 应用顺序版本（每次发布时至少+1）
   "description": "以指定几率进行复读的复读机。",
 
   "auth": [ // 应用权限（发布前请删除无用权限）

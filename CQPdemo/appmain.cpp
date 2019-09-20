@@ -10,10 +10,6 @@
 
 #include "echoplayer.h"
 
-#define PVT 0
-#define GRP 1
-#define DSC 2
-
 using namespace std;
 
 int ac = -1; //AuthCode 调用酷Q的方法时需要用到

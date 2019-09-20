@@ -18,8 +18,6 @@ constexpr auto GRP = 1;
 constexpr auto DIS = 2;
 constexpr auto ING = 3;
 
-#define ISNUM(n) (n >= '0' && n <= '9' || n == '.')
-
 using namespace std;
 
 
@@ -29,12 +27,8 @@ using namespace std;
 extern int ac;
 static string _home_ = "data\\app\\skot\\";
 static string usrDir = _home_ + "usr\\";
-static string tmpDir = _home_ + "tmp\\";
 static string sudoerFile = _home_ + "sudoers.csv";
-static string echoFile = _home_ + "usr\\echo.csv";
 static string blackFile = _home_ + "blackList.csv";
-
-static int64_t superadmin = 95806902;
 
 //	错误：xxxxxx<str>xxxxxx。[recommand]
 //class xx_exception : public exception {
@@ -67,8 +61,42 @@ void Init()
 {
 	if (_access(_home_.data(), 00) == -1) _mkdir(_home_.data());
 	if (_access(usrDir.data(), 00) == -1) _mkdir(usrDir.data());
-	if (_access(tmpDir.data(), 00) == -1) _mkdir(tmpDir.data());
 }
+
+
+
+///	【异常】
+
+//	错误：<str>不是合法的数字。
+class str_not_num : public exception {
+public: str_not_num(string str) :
+	exception::exception(("错误：" + str + "不是合法的数字。").data()) {};
+};
+//	错误：参数<str>只在群/组内可用。[recommand]
+class arg_used_in_pvt : public exception {
+public: arg_used_in_pvt(string str, string recommand = "") :
+	exception::exception(("错误：参数" + str + "只在群/组内可用。" + recommand).data()) {};
+};
+//	错误：<str>缺少必要的参数。[recommand]
+class arg_not_found : public exception {
+public: arg_not_found(string str, string recommand = "") :
+	exception::exception(("错误：" + str + "缺少必要的参数。" + recommand).data()) {};
+};
+//	错误：参数<str>不合法。[recommand]
+class arg_illegal : public exception {
+public: arg_illegal(string str, string recommand = "") :
+	exception::exception(("错误：参数" + str + "不合法。" + recommand).data()) {};
+};
+//	错误：参数<str>不能同时使用。[recommand]
+class arg_use_same_time : public exception {
+public: arg_use_same_time(string str, string recommand = "") :
+	exception::exception(("错误：参数" + str + "不能同时使用。" + recommand).data()) {};
+};
+//	错误：<str>需要DM权限。[recommand]
+class operator_is_not_dm : public exception {
+public: operator_is_not_dm(string str, string recommand = "") :
+	exception::exception(("错误：" + str + "需要DM权限。" + recommand).data()) {};
+};
 
 
 
@@ -200,77 +228,148 @@ vector<string> csv(string line)
 ///	【cast】
 
 //	将字符串转为整数
-int to_int(string str)
+int64_t to_int(string str)
 {
-	int Ly = 0;
-	bool dT = false;
+	int64_t Ly = 0;
+	bool positive = true;
 
-	bool neg = false;
-	if (*str.begin() == '-')
+	int stat = 0;
+	for (char D2 : str) switch (stat)
 	{
-		str.erase(0, 1);
-		neg = true;
+	case 0:
+		if (D2 == '+' || D2 == '-')
+		{
+			stat = 1;
+			if (D2 == '-') positive = false;
+		}
+		else if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 2;
+			Ly *= 10;
+			Ly += D2 - '0';
+		}
+		else throw (str_not_num(str));
+		break;
+	case 1:
+		if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 2;
+			Ly *= 10;
+			Ly += D2 - '0';
+		}
+		else throw (str_not_num(str));
+		break;
+	case 2:
+		if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 2;
+			Ly *= 10;
+			Ly += D2 - '0';
+		}
+		else if (D2 == '.') stat = 3;
+		else throw (str_not_num(str));
+		break;
+	case 3:
+		if ('0' <= D2 && D2 <= '9') stat = 4;
+		else throw (str_not_num(str));
+		break;
+	case 4:
+		if ('0' <= D2 && D2 <= '9') stat = 4;
+		else throw (str_not_num(str));
+		break;
 	}
-
-	for (char D2 : str)
+	if (stat == 2 || stat == 4)
 	{
-		if (dT) continue;
-		else if (D2 == '.') dT = true;
-		else if (ISNUM(D2)) Ly *= 10, Ly += D2 - '0';
-		else return 0;
+		if (!positive) Ly = -Ly;
+		return Ly;
 	}
-
-	if (neg) Ly = -Ly;
-	return Ly;
+	else throw (str_not_num(str));
 }
 //	将字符串转为小数
 double to_double(string str)
 {
 	double Ly = 0;
-	int Fred = -1;
+	bool positive = true;
+	int dot = 0;
 
-	bool neg = false;
-	if (*str.begin() == '-')
+	int stat = 0;
+	for (char D2 : str) switch (stat)
 	{
-		str.erase(0, 1);
-		neg = true;
+	case 0:
+		if (D2 == '+' || D2 == '-')
+		{
+			stat = 1;
+			if (D2 == '-') positive = false;
+		}
+		else if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 2;
+			Ly *= 10;
+			Ly += D2 - '0';
+		}
+		else throw (str_not_num(str));
+		break;
+	case 1:
+		if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 2;
+			Ly *= 10;
+			Ly += D2 - '0';
+		}
+		else throw (str_not_num(str));
+		break;
+	case 2:
+		if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 2;
+			Ly *= 10;
+			Ly += D2 - '0';
+		}
+		else if (D2 == '.') stat = 3;
+		else throw (str_not_num(str));
+		break;
+	case 3:
+		if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 4;
+			Ly *= 10;
+			Ly += D2 - '0';
+			dot++;
+		}
+		else throw (str_not_num(str));
+		break;
+	case 4:
+		if ('0' <= D2 && D2 <= '9')
+		{
+			stat = 4;
+			Ly *= 10;
+			Ly += D2 - '0';
+			dot++;
+		}
+		else throw (str_not_num(str));
+		break;
 	}
-
-	for (char D2 : str)
+	if (stat == 2 || stat == 4)
 	{
-		if (Fred != -1) Fred++;
-		if (D2 == '.') Fred++;
-		else if (ISNUM(D2)) Ly *= 10, Ly += D2 - '0';
-		else return 0.0;
+		for (; dot != 0; dot--) Ly /= 10;
+		if (!positive) Ly = -Ly;
+		return Ly;
 	}
-	if (Fred != -1) for (; Fred != 0; Fred--) Ly /= 10;
-
-	if (neg) Ly = -Ly;
-	return Ly;
+	else throw (str_not_num(str));
 }
 //	将字符串转为qq（包括CQ码的@）
 int64_t to_QQNumber(string str)
 {
 	if (str.find("[CQ:at,qq=") == 0 && *(str.end() - 1) == ']') str.erase(0, 10), str.erase(str.end() - 1);
 	int64_t Ly = 0;
-	bool dT = false;
-
-	bool neg = false;
-	if (*str.begin() == '-')
+	try
 	{
-		str.erase(0, 1);
-		neg = true;
+		Ly = to_int(str);
 	}
-
-	for (char D2 : str)
+	catch (str_not_num e)
 	{
-		if (dT) continue;
-		else if (D2 == '.') dT = true;
-		else if (ISNUM(D2)) Ly *= 10, Ly += D2 - '0';
-		else return 0;
+		Ly = -1;
 	}
-
-	if (neg) Ly = -Ly;
 	return Ly;
 }
 //	@qq
@@ -296,9 +395,34 @@ bool is_QQNumber(string str)
 //	检查字符串是否是数字
 bool is_num(string str)
 {
-	bool Ly = true;
-	for (char D2 : str) if ((D2 < '0' || D2 > '9') && D2 != '.' && D2 != '-') Ly = false;
-	return Ly;
+	int stat = 0;
+	for (char D2 : str) switch (stat)
+	{
+	case 0:
+		if (D2 == '+' || D2 == '-') stat = 1;
+		else if ('0' <= D2 && D2 <= '9') stat = 2;
+		else return false;
+		break;
+	case 1:
+		if ('0' <= D2 && D2 <= '9') stat = 2;
+		else return false;
+		break;
+	case 2:
+		if ('0' <= D2 && D2 <= '9') stat = 2;
+		else if (D2 == '.') stat = 3;
+		else return false;
+		break;
+	case 3:
+		if ('0' <= D2 && D2 <= '9') stat = 4;
+		else return false;
+		break;
+	case 4:
+		if ('0' <= D2 && D2 <= '9') stat = 4;
+		else return false;
+		break;
+	}
+	if (stat == 2 || stat == 4) return true;
+	else return false;
 }
 
 
@@ -309,19 +433,45 @@ bool is_num(string str)
 class Group
 {
 	int64_t gid;
-	vector<int64_t> dM;
-	bool stat;
-	int rate;
-	bool counter;
+	vector<int64_t> dm;
 	string CCC;
+
+	bool stat;
+	bool counter;
+	int repeat;
+	int repeatRate;
+	int interrupt;
+	int interruptRate;
+	string s1;
+	string s2;
+
+	string toString()
+	{
+		string Ly = CCC;
+		Ly += (string)"\necho," + (stat ? "1" : "0")
+			+ "," + (counter ? "1" : "0")
+			+ "," + to_string(repeat)
+			+ "," + to_string(repeatRate)
+			+ "," + to_string(interrupt)
+			+ "," + to_string(interruptRate)
+			+ "," + s1
+			+ "," + s2;
+		if (!Ly.empty()) Ly.erase(0, 1);
+		return Ly;
+	}
 
 public:
 	Group(int64_t gid)
 	{
 		this->gid = gid;
 		stat = false;
-		rate = 10;
 		counter = false;
+		repeat = 0;
+		repeatRate = 10;
+		interrupt = 1;
+		interruptRate = 10;
+		s1 = "打断复读";
+		s2 = "学什么学";
 
 		ifstream CH(usrDir + "g" + to_string(gid) + ".csv");
 		bool Sp = false;
@@ -333,29 +483,29 @@ public:
 			{
 				getline(CH, P2); if (P2.empty()) continue;
 				cy = csv(P2);
-				if (cy[0]._Equal("dm")) dM.push_back(to_int(cy[1]));
+				if (cy[0]._Equal("dm")) dm.push_back(to_int(cy[1]));
 
 				if (cy[0]._Equal("echo"))
 				{
-					Sp = true;
-					stat = cy[1]._Equal("on");
-					rate = to_int(cy[2]);
-					counter = cy[3]._Equal("counter");
+					if (cy.size() == 9)
+					{
+						Sp = true;
+						stat = cy[1]._Equal("1");
+						counter = cy[2]._Equal("1");
+						repeat = to_int(cy[3]);
+						repeatRate = to_int(cy[4]);
+						interrupt = to_int(cy[5]);
+						interruptRate = to_int(cy[6]);
+						s1 = cy[7];
+						s2 = cy[8];
+					}
 				}
 				else CCC += "\n" + P2;
 			}
 			CH.close();
 		}
 	}
-	string toString()
-	{
-		string Ly;
-		Ly += CCC;
-		Ly += (string)"\necho," + (stat ? "on" : "off") + "," + to_string(rate) + "," + (counter ? "counter" : "noCounter");
-		if (!Ly.empty()) Ly.erase(0, 1);
-		return Ly;
-	}
-	void Save()
+	~Group()
 	{
 		ofstream kx(usrDir + "g" + to_string(gid) + ".csv");
 		if (kx.is_open())
@@ -366,25 +516,29 @@ public:
 	}
 
 	//	set
-	void set(bool stat, int rate, bool counter)
-	{
-		this->stat = stat;
-		this->rate = rate;
-		this->counter = counter;
-	}
+	void setStat(bool newStat) { stat = newStat; }
+	void setCounter(bool newCounter) { counter = newCounter; }
+	void setRepeat(int newRepeat) { repeat = newRepeat; }
+	void setRepeatRate(int newRepeatRate) { repeatRate = newRepeatRate; }
+	void setInterrupt(int newInterrupt) { interrupt = newInterrupt; }
+	void setInterruptRate(int newInterruptRate) { interruptRate = newInterruptRate; }
+	void setS1(string newS1) { s1 = newS1; }
+	void setS2(string newS2) { s2 = newS2; }
 
 	//	get
-	void get(bool& stat, int& rate, bool& counter)
-	{
-		stat = this->stat;
-		rate = this->rate;
-		counter = this->counter;
-	}
+	bool getStat() { return stat; }
+	bool getCounter() { return counter; }
+	int getRepeat() { return repeat; }
+	int getRepeatRate() { return repeatRate; }
+	int getInterrupt() { return interrupt; }
+	int getInterruptRate() { return interruptRate; }
+	string getS1() { return s1; }
+	string getS2() { return s2; }
 
 	//	is?
 	bool is_dm(int64_t qq)
 	{
-		for (vector<int64_t>::iterator D2 = dM.begin(); D2 != dM.end(); D2++)
+		for (vector<int64_t>::iterator D2 = dm.begin(); D2 != dm.end(); D2++)
 			if (*D2 == qq) return true;
 		return false;
 	}
@@ -392,37 +546,8 @@ public:
 
 
 
-///	【指令】
-
-//	错误：参数<str>只在群/组内可用。[recommand]
-class arg_used_in_pvt : public exception {
-public: arg_used_in_pvt(string str, string recommand = "") :
-	exception::exception(("错误：参数" + str + "只在群/组内可用。" + recommand).data()) {};
-};
-//	错误：<str>缺少必要的参数。[recommand]
-class arg_not_found : public exception {
-public: arg_not_found(string str, string recommand = "") :
-	exception::exception(("错误：" + str + "缺少必要的参数。" + recommand).data()) {};
-};
-//	错误：参数<str>不合法。[recommand]
-class arg_illegal : public exception {
-public: arg_illegal(string str, string recommand = "") :
-	exception::exception(("错误：参数" + str + "不合法。" + recommand).data()) {};
-};
-//	错误：参数<str>不能同时使用。[recommand]
-class arg_use_same_time : public exception {
-public: arg_use_same_time(string str, string recommand = "") :
-	exception::exception(("错误：参数" + str + "不能同时使用。" + recommand).data()) {};
-};
-//	错误：<str>需要DM权限。[recommand]
-class operator_is_not_dm : public exception {
-public: operator_is_not_dm(string str, string recommand = "") :
-	exception::exception(("错误：" + str + "需要DM权限。" + recommand).data()) {};
-};
-
-
-
 ///	【紧急补丁】
+
 //	黑名单
 class BlackListUnit
 {
@@ -474,95 +599,58 @@ public:
 
 /// 【EchoPlayer】
 
-//	暂存最后一条触发复读的消息
-string lastEchoMsg(int64_t Group, string msg = "")
+class Record
 {
-	string Ly = "";
-	bool Sp = false;
+public:
+	string lastMessage;
+	int repeatTime;
+	bool repeated;
+};
+map<int64_t, Record> parakeet;
 
-	string CH = tmpDir + "echo";
-	string CCC = "";
-	string P2 = "";
-
-	ifstream in(CH);
-	if (in.is_open())
-	{
-		vector<string> cy;
-		for (bool Tron = false; !in.eof(); Tron = false)
-		{
-			getline(in, P2); if (P2.empty()) continue;
-			if (!Sp)
-			{
-				cy = csv(P2);
-				if (cy[0]._Equal(to_string(Group))) Tron = true;
-			}
-			if (Tron)
-			{
-				Sp = true;
-				if (msg.empty()) Ly = cy[1];
-				else cy[1] = to_csv(msg);
-				P2.clear();
-				P2 = cy[0] + "," + cy[1];
-			}
-			CCC += "\n" + P2;
-		}
-	}
-
-	if (!msg.empty())
-	{
-		if (!Sp) CCC += "\n" + to_string(Group) + "," + to_csv(msg);
-		CCC.erase(0, 1);
-
-		ofstream out(CH);
-		if (out.is_open())
-		{
-			out << CCC;
-			out.close();
-		}
-	}
-
-	return Ly;
-}
 //	复读操作
 void EchoPlayer(int type, int64_t gid, string msg)
 {
 	if (blackList.contains(0, gid)) return;
 
 	srand(GetTickCount64());
-
 	Group Where = Group(gid);
 
-	bool stat = false;
-	int rate = 10;
-	bool counter = false;
-	Where.get(stat, rate, counter);
+	//	复读机关闭
+	if (!Where.getStat()) return;
+	//	更新状态
+	if (msg._Equal(parakeet[gid].lastMessage)) parakeet[gid].repeatTime++;
+	else parakeet[gid].lastMessage = msg, parakeet[gid].repeated = false, parakeet[gid].repeatTime = 0;
 
-	if (!stat) return;
-	if (msg._Equal(lastEchoMsg(gid))) return;
-
-	if (rand() % 100 + 1 > rate) return;
-
-	if (counter)
+	//	打断
+	if (Where.getInterrupt() > 0 && parakeet[gid].repeatTime >= Where.getInterrupt() && Where.getInterruptRate() > rand() % 100)
 	{
-		string tmpMsg = msg;
-		vector<string> Fd
-		{ 
-			"。","，","！","？","；","～","（","）","【","】","《","》","…","—","“","”",
-			".",",","!","?","(",")","<",">","[","]","{","}","-","~",";","*","\'","\"" 
-		};
-		for (auto D2 : Fd) for (; tmpMsg.find(D2) != string::npos; tmpMsg.erase(tmpMsg.find(D2), D2.length()));
-
-		
-		if (!tmpMsg.empty() && tmpMsg.length() < 4)
-		{
-			if (tmpMsg._Equal("我")) tmpMsg = "你";
-			else if (tmpMsg._Equal("你")) tmpMsg = "我";
-			msg = tmpMsg + "什么" + tmpMsg;
-		}
+		if (!msg._Equal(Where.getS1())) parakeet[gid].lastMessage = Where.getS1(), PostMsg(type, gid, Where.getS1());
+		else parakeet[gid].lastMessage = Where.getS2(), PostMsg(type, gid, Where.getS2());
+		parakeet[gid].repeated = true, parakeet[gid].repeatTime = 0;
 	}
-	lastEchoMsg(gid, msg);
+	//	复读
+	else if (!parakeet[gid].repeated && parakeet[gid].repeatTime >= Where.getRepeat() && Where.getRepeatRate() > rand() % 100)
+	{
+		if (Where.getCounter())
+		{
+			string tmpMsg = msg;
+			vector<string> Fd
+			{
+				"。","，","！","？","；","～","（","）","《","》","【","】","…","—","“","”",
+				".",",","!","?","(",")","<",">","[","]","{","}","-","~",",","*","\'","\""
+			};
+			for (auto D2 : Fd) for (; tmpMsg.find(D2) != string::npos; tmpMsg.erase(tmpMsg.find(D2), D2.length()));
 
-	PostMsg(type, gid, msg);
+			string testSpaceStr = "";
+			for (auto D2 : tmpMsg) if (D2 != ' ') testSpaceStr += D2;
+
+			if (!tmpMsg.empty() && !testSpaceStr.empty() && tmpMsg.length() < 4) msg = tmpMsg + "什么" + tmpMsg;
+			parakeet[gid].lastMessage = msg, parakeet[gid].repeated = true, parakeet[gid].repeatTime = 0;
+		}
+		else parakeet[gid].repeated = true, parakeet[gid].repeatTime++;
+		PostMsg(type, gid, msg);
+	}
 }
 
 
@@ -575,21 +663,13 @@ string echo(bool sudo, int type, int64_t qq, int64_t gid, vector<string> args)
 	string Ly = "";
 
 	Group Where = Group(gid);
+	bool Aur = sudo || Where.is_dm(qq);
 
 	bool help = false;
 	bool ver = false;
 	bool src = false;
-	bool setStat = false;
-	bool setRate = false;
-	bool setCounter = false;
-	bool list = true;
-
-	/*  id = 0  */	bool newStat;
-	/*  id = 1  */	int newRate = 0;
-	/*  id = 2  */	int newCounter = -1;
-
-	stack<int> ACP;
-	ACP.push(0);
+	bool list = false;
+	vector<string> sets;
 
 	for (int i = 1; i != args.size(); i++)
 	{
@@ -601,59 +681,24 @@ string echo(bool sudo, int type, int64_t qq, int64_t gid, vector<string> args)
 			else if (args[i]._Equal("--ver")) ver = true;
 			else if (args[i]._Equal("--source")) src = true;
 			else if (args[i]._Equal("--vs")) ver = src = true;
-
-			else if (args[i]._Equal("-rate")) setRate = true, ACP.push(1);
-			else if (args[i]._Equal("-counter")) setCounter = true, ACP.push(2);
-
-			if (setRate && !sudo && !Where.is_dm(qq))
-				throw (operator_is_not_dm("-rate参数"));
-			if (setCounter && !sudo && !Where.is_dm(qq))
-				throw (operator_is_not_dm("-counter参数"));
 		}
 		else
 		{
+			if (!Aur) throw (operator_is_not_dm("设置EchoPlayer"));
 			anal(args[i]);
-			if (!ACP.empty())
-			{
-				switch (ACP.top())
-				{
-				case 0:
-					setStat = true;
-					if (setStat && !sudo && !Where.is_dm(qq))
-						throw (operator_is_not_dm("-counter参数"));
-					if (args[i]._Equal("on")) newStat = true;
-					else if (args[i]._Equal("off")) newStat = false;
-					else throw (arg_illegal(args[i], "只能使用on或off。"));
-					break;
-				case 1:
-					if (!is_num(args[i]))
-						throw (arg_illegal("(-rate)" + args[i]), "请更正为1-100的正整数。");
-					newRate = to_int(args[i]);
-					if (newRate < 1 || newRate>100)
-						throw (arg_illegal("(-rate)" + args[i], "触发概率不能小于1，且不能大于100。"));
-					break;
-				case 2:
-					if (args[i]._Equal("on")) newCounter = 1;
-					else if (args[i]._Equal("off")) newCounter = 0;
-					else throw (arg_illegal("(-counter)" + args[i], "只能使用on或off。"));
-					break;
-				}
-				ACP.pop();
-			}
+			sets.push_back(args[i]);
 		}
 	}
 
 	if (type == PVT) return "错误：指令echo只能在群/组内使用。";
-	if (setRate && newRate == 0) throw (arg_not_found("-rate", "请追加1-100的正整数。"));
-	if (setCounter && newCounter == -1) throw (arg_not_found("-counter", "需要指定on/off。"));
 
-	bool Aur = sudo || Where.is_dm(qq);
+	if (args.size() == 1) list = true;
+
 	if (help) return string("")
 		+ "【用法】\n"
-		+ ".echo" + (Aur ? " [on/off]" : "") + "\n" + (Aur ? "开启或关闭EchoPlayer，如果没有提供参数，则" : "") + "显示EchoPlayer当前的状态。\n\n"
+		+ ".echo\n显示EchoPlayer当前的状态。\n\n"
 		+ "【参数】\n"
-		+ (Aur ? "-rate <几率>\n设置触发几率。\n\n" : "")
-		+ (Aur ? "-counter <on/off>\n开启或关闭counter模式。\n\n" : "")
+		+ (Aur ? "<属性>=<值>\n设置指定属性的值。详细设置方法请使用.echo ?查看。\n\n" : "")
 		+ "--ver\n查看版本信息。\n\n"
 		+ "--source\n获取源码。\n\n"
 		+ "--help\n显示此信息。";
@@ -665,35 +710,179 @@ string echo(bool sudo, int type, int64_t qq, int64_t gid, vector<string> args)
 		+ (ver ? "本软件是自由软件：您可以自由修改和重新发布它。\n" : "")
 		+ (ver ? "在法律范围内没有其他保障。\n" : "")
 		+ (ver ? "\n" : "")
-		+ (ver ? "由 天意618A03 (95806902) 编写。\n" : "")
+		+ (ver ? "由 Wyrda La Darckonit (Westerm_Dragon@126.com) 编写。\n" : "")
 		+ (src ? "源码：https://github.com/Wyrda-La-Darckonit/EchoPlayer-for-Skot.git" : "");
 
-	bool stat = false;
-	int rate = 10;
-	bool counter = false;
-	Where.get(stat, rate, counter);
+	if (list) return (string)"EchoPlayer当前状态：\n"
+		+ "运行状态：" + (Where.getStat() ? "开启" : "关闭") + "\n"
+		+ "反击模式：" + (Where.getCounter() ? "开启" : "关闭") + "\n"
+		+ "触发计数：" + to_string(Where.getRepeat()) + "次复读\n"
+		+ "触发概率：" + to_string(Where.getRepeatRate()) + "%\n"
+		+ (Where.getInterrupt() == 0 ? "扰断功能关闭" : "")
+		+ (Where.getInterrupt() == 0 ? "" : "扰断计数：" + to_string(Where.getInterrupt()) + "次复读\n")
+		+ (Where.getInterrupt() == 0 ? "" : "扰断概率：" + to_string(Where.getInterruptRate()) + "%");
 
-	if (setStat)
+	if (sets.size() != 0)
 	{
-		Where.set(newStat, rate, counter);
-		Where.Save();
-		Ly += string("") + "EchoPlayer" + (newStat ? "开启" : "关闭") + "。\n";
-	}
-	if (setRate)
-	{
-		Where.set(stat, newRate, counter);
-		Where.Save();
-		Ly += string("") + "EchoPlayer的触发概率被设为" + to_string(newRate) + "%。\n";
-	}
-	if (setCounter)
-	{
-		Where.set(stat, rate, newCounter == 1 ? true : false);
-		Where.Save();
-		Ly += string("") + "EchoPlayer的counter模式" + (newCounter == 1 ? "开启" : "关闭") + "。\n";
-	}
+		for each (auto D2 in sets) if (D2._Equal("?") || D2._Equal("？")) return (string)"设置方法："
+			+ "\n.echo <属性>=<值> [<属性>=<值>]"
+			+ "\n"
+			+ "\n可用属性："
+			+ "\n运行状态：st/stat，控制EchoPlayer是否开启，应设定为on/off"
+			+ "\n反击模式：ct/counter，控制反击模式是否开启，应设定为on/off"
+			+ "\n触发计数：rt/repeat，指定至少经过多少次复读后才会触发EchoPlayer的复读，应设定为不小于0的整数"
+			+ "\n触发概率：rr/rtrate，指定EchoPlayer复读的概率，应设定为最小为0最大为100的整数"
+			+ "\n扰断计数：it/interrupt，指定至少经过多少次复读后才会触发EchoPlayer的扰断，应设定为不小于0的整数（见下文）"
+			+ "\n扰断概率：ir/itrate，指定EchoPlayer扰断的概率，应设定为最小为0最大为100的整数"
+			+ "\n扰断文本：s1，指定EchoPlayer扰断复读时所用的文本，可设定为任意文本"
+			+ "\n备用文本：s2，指定当扰断文本被复读时EchoPlayer进行扰断所用的文本，可设定为任意文本，但不能与扰断文本重复"
+			+ "\n"
+			+ "\n注意事项："
+			+ "\n反击模式是指，当被复读的消息很短（小于4个字节，大多数标点符号都不计入）时，EchoPlayer会发送“xx什么xx”来替代正常的复读。"
+			+ "\n等于号“=”的左右两侧都不能有空格，否则会导致无法正常识别字段。"
+			+ "\n触发计数与触发概率之间的关系为“与”，即只有在复读次数达到触发计数后，才会按照触发概率进行复读。扰断同理。"
+			+ "\n当触发计数设定为0时，表示不需要产生复读即可触发，即每一条消息都会按照触发概率触发复读。若触发概率被设为100，则每一条消息都会被立即复读。"
+			+ "\n当扰断计数设定为0时，扰断功能会关闭，这是因为当没有形成复读时不应予以扰断。若要使用扰断功能，扰断计数应至少设定为1。"
+			+ "\n当触发计数和扰断计数都被满足时，优先进行扰断判定。例如，扰断概率为80%，复读概率为40%时，实际响应情况为，扰断80%，复读8%，不响应12%。"
+			+ "\n"
+			+ "\n示例："
+			+ "\n.echo stat=on"
+			+ "\n开启EchoPlayer。"
+			+ "\n.echo repeat=0 rtrate=20"
+			+ "\n设置触发计数为0，触发概率为20%；每条消息都有20%的几率触发复读。"
+			+ "\n.echo rt=1 rr=100 it=3 ir=50 ct=on"
+			+ "\n当一条消息被复读1次后，100%概率跟读；当这条消息被复读3次后（EchoPlayer本身的复读也被计入），50%概率扰断；开启反击模式。";
+		
+		string key;
+		string fail;
+		bool edit[8] = { false };
+		int val;
+		string str;
 
-	Where.get(stat, rate, counter);
-	if (list) Ly += string("") + "EchoPlayer：" + (stat ? "开启" : "关闭") + "\n触发概率：" + to_string(rate) + "%\ncounter模式：" + (counter ? "开启" : "关闭");
+		for each (auto D2 in sets)
+		{
+			if (D2.find("=") == string::npos || D2.find("=") == 0)
+			{
+				fail += "；\n无法识别字段“" + D2 + "”";
+				continue;
+			}
+
+			key = D2.substr(0, D2.find("="));
+			for (auto Fd = key.begin(); Fd != key.end(); Fd++) if ('A' <= *Fd && *Fd <= 'Z')* Fd += 'a' - 'A';
+
+			if (key._Equal("st") || key._Equal("stat"))
+			{
+				str = D2.substr(D2.find("=") + 1);
+				for (auto Fd = str.begin(); Fd != str.end(); Fd++) if ('A' <= *Fd && *Fd <= 'Z')* Fd += 'a' - 'A';
+				if (str.empty()) fail += "；\n需要为运行状态设定一个值（on/off）";
+				else if (str._Equal("on") || str._Equal("1")) Where.setStat(true), edit[0] = true;
+				else if (str._Equal("off") || str._Equal("0")) Where.setStat(false), edit[0] = true;
+				else fail += "；\n运行状态应该设定为on/off";
+			}
+			else if (key._Equal("ct") || key._Equal("counter"))
+			{
+				str = D2.substr(D2.find("=") + 1);
+				for (auto Fd = str.begin(); Fd != str.end(); Fd++) if ('A' <= *Fd && *Fd <= 'Z')* Fd += 'a' - 'A';
+				if (str.empty()) fail += "；\n需要为反击模式设定一个值（on/off）";
+				else if (str._Equal("on") || str._Equal("1")) Where.setCounter(true), edit[1] = true;
+				else if (str._Equal("off") || str._Equal("0")) Where.setCounter(false), edit[1] = true;
+				else fail += "；\n反击模式应该设定为on/off";
+			}
+			else if (key._Equal("rt") || key._Equal("repeat"))
+			{
+				if (D2.substr(D2.find("=") + 1).empty()) fail += "；\n需要为触发计数设定一个值（非负整数）";
+				else try
+				{
+					val = to_int(D2.substr(D2.find("=") + 1));
+					if (val < 0) fail += "；n触发计数不应小于0";
+					else Where.setRepeat(val), edit[2] = true;
+				}
+				catch (str_not_num e)
+				{
+					fail += "；\n触发计数应该设定为非负整数";
+				}
+			}
+			else if (key._Equal("rtrate") || key._Equal("rr"))
+			{
+				if (D2.substr(D2.find("=") + 1).empty()) fail += "；\n需要为触发概率设定一个值（0-100）";
+				else try
+				{
+					val = to_int(D2.substr(D2.find("=") + 1));
+					if (val < 0) fail += "；\n触发概率不应小于0";
+					else if (val > 100) fail += "；\n触发概率不应大于100";
+					else Where.setRepeatRate(val), edit[3] = true;
+				}
+				catch (str_not_num e)
+				{
+					fail += "；\n触发概率应该设定最小为0，最大为100的整数";
+				}
+			}
+			else if (key._Equal("it") || key._Equal("interrupt"))
+			{
+				if (D2.substr(D2.find("=") + 1).empty()) fail += "；\n需要为扰断计数设定一个值（不小于0的整数）";
+				else try
+				{
+					val = to_int(D2.substr(D2.find("=") + 1));
+					if (val < 0) fail += "；n扰断计数不应小于0";
+					else Where.setInterrupt(val), edit[4] = true;
+				}
+				catch (str_not_num e)
+				{
+					fail += "；n扰断计数应该设定为不小于0的整数";
+				}
+			}
+			else if (key._Equal("itrate") || key._Equal("ir"))
+			{
+				if (D2.substr(D2.find("=") + 1).empty()) fail += "；\n需要为扰断概率设定一个值（0-100）";
+				else try
+				{
+					val = to_int(D2.substr(D2.find("=") + 1));
+					if (val < 0) fail += "；\n扰断概率不应小于0";
+					else if (val > 100) fail += "；\n扰断概率不应大于100";
+					else Where.setInterruptRate(val), edit[5] = true;
+				}
+				catch (str_not_num e)
+				{
+					fail += "；n扰断概率应该设定最小为0，最大为100的整数";
+				}
+			}
+			else if (key._Equal("s1"))
+			{
+				str = D2.substr(D2.find("=") + 1);
+				if (str.empty()) fail += "；\n需要为扰断文本设定一个值（任意文本）";
+				else Where.setS1(str), edit[6] = true;
+			}
+			else if (key._Equal("s2"))
+			{
+				str = D2.substr(D2.find("=") + 1);
+				if (str.empty()) fail += "\n需要为备用文本设定一个值（任意文本）。";
+				else Where.setS2(str), edit[7] = true;
+			}
+			else fail += "；\n没有此属性：" + key;
+		}
+		if (!fail.empty()) fail.erase(0, 2), fail += "。";
+
+		if (Where.getS1()._Equal(Where.getS2()))
+		{
+			edit[7] = true;
+			if (!Where.getS1()._Equal("学什么学")) Where.setS2("学什么学");
+			else Where.setS2("打断复读");
+		}
+
+		for (int i = 0; i != 8; i++) if (edit[i]) switch (i)
+		{
+		case 0: Ly += (string)"；\nEchoPlayer" + (Where.getStat() ? "开启" : "关闭"); break;
+		case 1: Ly += (string)"；\n反击模式" + (Where.getCounter() ? "开启" : "关闭"); break;
+		case 2: Ly += "；\n触发计数设定为" + to_string(Where.getRepeat()); break;
+		case 3: Ly += "；\n触发概率设定为" + to_string(Where.getRepeatRate()) + "%"; break;
+		case 4: Ly += (Where.getInterrupt() == 0 ? "；\n扰断功能关闭" : "；\n扰断计数设定为" + to_string(Where.getInterrupt())); break;
+		case 5: Ly += (Where.getInterrupt() == 0 ? "" : "；\n扰断概率设定为" + to_string(Where.getInterruptRate()) + "%"); break;
+		case 6: Ly += (Where.getInterrupt() == 0 ? "" : "；\n扰断文本设定为“" + Where.getS1() + "”"); break;
+		case 7: Ly += (Where.getInterrupt() == 0 ? "" : "；\n备用文本设定为“" + Where.getS2() + "”"); break;
+		}
+		if (!Ly.empty()) Ly.erase(0, 3), Ly += "。";
+		if (!fail.empty()) Ly += fail;
+	}
 
 	return Ly;
 }
@@ -778,14 +967,14 @@ void run_main(int type, int64_t qq, int64_t gid, string msg)
 		/*  id = 2  */	int64_t asinDiscuss = -1;
 
 		stack<int> ACP;
-		for (int i = 1; i != args.size(); i++)
+		for (auto it = args.begin() + 1; it != args.end(); it++)
 		{
-			if (args[i].find("-") == 0)
+			if ((*it).find("-") == 0)
 			{
-				if (args[i]._Equal("-as")) args[i].clear(), as = true, ACP.push(0);
-				else if (args[i]._Equal("-asg")) args[i].clear(), asG = true, ACP.push(1);
-				else if (args[i]._Equal("-asd")) args[i].clear(), asD = true, ACP.push(2);
-				else if (args[i]._Equal("-asp")) args[i].clear(), asP = true;
+				if ((*it)._Equal("-as")) args.erase(it--), as = true, ACP.push(0);
+				else if ((*it)._Equal("-asg")) args.erase(it--), asG = true, ACP.push(1);
+				else if ((*it)._Equal("-asd")) args.erase(it--), asD = true, ACP.push(2);
+				else if ((*it)._Equal("-asp")) args.erase(it--), asP = true;
 
 				if (asG && asD || asG && asP || asD && asP)
 					throw (arg_illegal("-asg、-asd、-asp", "这三个参数只能同时使用一个。"));
@@ -794,26 +983,26 @@ void run_main(int type, int64_t qq, int64_t gid, string msg)
 			{
 				if (!ACP.empty())
 				{
-					anal(args[i]);
+					anal(*it);
 					switch (ACP.top())
 					{
 					case 0:
-						if (!is_QQNumber(args[i]))
-							throw (arg_illegal("(-as)" + args[i], "请更正为正确的QQ号码，或者直接@成员。"));
-						asQQ = to_QQNumber(args[i]);
-						args[i].clear();
+						if (!is_QQNumber(*it))
+							throw (arg_illegal("(-as)" + *it, "请更正为正确的QQ号码，或者直接@成员。"));
+						asQQ = to_QQNumber(*it);
+						args.erase(it--);
 						break;
 					case 1:
-						if (!is_QQNumber(args[i]))
-							throw (arg_illegal("(-asg)" + args[i], "请更正为正确的群号码。"));
-						asinGroup = to_QQNumber(args[i]);
-						args[i].clear();
+						if (!is_QQNumber(*it))
+							throw (arg_illegal("(-asg)" + *it, "请更正为正确的群号码。"));
+						asinGroup = to_QQNumber(*it);
+						args.erase(it--);
 						break;
 					case 2:
-						if (!is_QQNumber(args[i]))
-							throw (arg_illegal("(-asd)" + args[i], "请更正为正确的组号码。"));
-						asinGroup = to_QQNumber(args[i]);
-						args[i].clear();
+						if (!is_QQNumber(*it))
+							throw (arg_illegal("(-asd)" + *it, "请更正为正确的组号码。"));
+						asinGroup = to_QQNumber(*it);
+						args.erase(it--);
 						break;
 					}
 					ACP.pop();
@@ -839,26 +1028,7 @@ void run_main(int type, int64_t qq, int64_t gid, string msg)
 
 	try
 	{
-		if (args.back()._Equal("--debug"))
-		{
-			Ly += "type = ";
-			switch (type)
-			{
-			case PVT: Ly += "private\n"; break;
-			case GRP: Ly += "group\n"; break;
-			case DIS: Ly += "discuss\n"; break;
-			}
-			Ly += "QQ = " + to_string(qq) + "\n";
-			if (type != PVT) Ly += "Group = " + to_string(gid) + "\n";
-			Ly += "argc = " + to_string(args.size() - 1);
-			for (int i = 0; i != args.size() - 1; i++)
-			{
-				Ly.append("\nargv[").append(to_string(i)).append("] = ").append(args[i]);
-			}
-			PostMsg(type, (type == PVT ? qq : gid), Ly);
-			return;
-		}
-		else if (args[0]._Equal("echo")) Ly += echo(sudo, type, qq, gid, args);
+		if (args[0]._Equal("echo")) Ly += echo(sudo, type, qq, gid, args);
 	}
 	catch (exception Ed)
 	{
